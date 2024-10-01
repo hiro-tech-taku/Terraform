@@ -17,7 +17,3 @@ Resources:
         - Key: Name
           Value: test server
 
-Outputs:
-  URL:
-    Description: URL of the sample website
-    Value: !Sub  'http://${EC2Instance.PublicDnsName}'
