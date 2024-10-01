@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters: 
+  
+  AmazonLinuxAMIID:
+      Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+      Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2
+
+Resources: 
+
+  myEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId:  !Ref AmazonLinuxAMIID
+      InstanceType: t2.micro
+      Tags:
+        - Key: Name
+          Value: test server
+
+Outputs:
+  URL:
+    Description: URL of the sample website
+    Value: !Sub  'http://${EC2Instance.PublicDnsName}'
