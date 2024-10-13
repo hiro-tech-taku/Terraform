@@ -1,0 +1,103 @@
+### template.yaml
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  ResourceName:
+    Type: String
+  Email:
+    Type: String
+
+Resources:
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Code:
+        ZipFile: !Sub |
+          import boto3
+          import os
+          import datetime
+          client = boto3.client('sns')
+          topic_arn = os.environ['TopicArn']
+          def lambda_handler(event, context):
+              dt_now = datetime.datetime.now().strftime('%Y年%m月%d日 %H:%M:%S')
+              params = {
+                  'TopicArn': topic_arn,
+                  'Subject': 'メール送信_'+ str(dt_now),
+                  'Message': '本文\n\nLambda経由でSNSを使用し、メッセージを送信しています。\n' + str(dt_now)
+              }
+              client.publish(**params)
+      FunctionName: !Sub ${ResourceName}-function
+      Runtime: python3.11
+      MemorySize: 1024
+      Timeout: 60
+      Environment:
+        Variables:
+          TopicArn : !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ResourceName}-sns
+      Role: !GetAtt
+        - LambdaExecutionRole
+        - Arn
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ${ResourceName}-function-execution-role
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: !Sub ${ResourceName}-function-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${ResourceName}-function:*
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:CreateExportTask
+                  - s3:GetBucketAcl
+                  - s3:PutObject
+        - PolicyName: !Sub ${ResourceName}-function-sns-policy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Resource: !Sub arn:aws:sns:${AWS::Region}:${AWS::AccountId}:${ResourceName}-sns
+                Effect: Allow
+                Action:
+                  - sns:Publish
+
+  SnsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${ResourceName}-sns
+      FifoTopic: false
+      TopicName: !Sub ${ResourceName}-sns
+      Subscription:
+        - Endpoint: !Ref Email
+          Protocol: email
+
+  EventBridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: default
+      Name: !Sub ${ResourceName}-eventbridge
+      ScheduleExpression: cron(0 18 * * ? *)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt LambdaFunction.Arn
+          Id: LambdaFunction
+
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt 'EventBridgeRule.Arn'
