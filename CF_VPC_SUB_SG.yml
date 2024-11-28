@@ -31,4 +31,12 @@ Resources:
       Tags:
         - Key: Name
           Value: HiroseSG
-        
+Outputs:
+  Subnet1:
+    Value: !Ref subnetName
+    Export:
+      Name: Subnet1Name
+  SG1:
+    Value: !Ref secGroupName
+    Export:
+      Name: SG1Name
