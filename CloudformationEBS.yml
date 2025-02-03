@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  EnvType:
+    Description: Environment type.
+    Default: test
+    Type: String 
+    AllowedValues:
+      - prod 
+      - test 
+
+  AmazonLinuxAMIID:
+      Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+      Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2
+
+Conditions: 
+  CreateProdResources: !Equals [!Ref Envtype, prod ]
+# if文のような使い方、上記でprodを選ぶとこのリソースが自動で選択される仕組み
+
+Resources:
+  myEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Ref AmazonLinuxAMIID
+      InstanceType: t2.micro
+      Tags:
+        - Key: Name 
+          Value: Hirose Server
+
+  MountPoint:
+    Type: "AWS::EC2::VolumeAttachment"
+    Condition: CreateProdResources
+    Properties:
+      InstanceId:
+        !Ref EC2Instance 
+      VolumeId:
+        !Ref NewVolume
+      Device: /dev/sdh
+      
+  NewVolume:
+    Type: "AWS::EC2::Volume"
+    Condition: CreateProdResources
+    Properties:
+      AvailabilityZone: !GetAtt EC2Instance.AvailabilityZone 
+      Size: 100
+      Tags:
+        - Key: Name 
+          Value: EBS Hirose
